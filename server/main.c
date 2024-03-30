@@ -67,5 +67,7 @@ int main(){
     printf("\nBinding Socket...\n");
     if((rc = bind_socket(sfd, addr, port))) return rc;
 
+    
+
     return 0;
 }
