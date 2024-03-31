@@ -21,8 +21,16 @@ int generate_socket(int* sfd);
 int connect_socket(int sfd, char* addr, uint16_t port);
 
 // input: sfd: socket file descriptor
-// output: return code
+// output: error code, 0 pass, -1 fail
 int comms(int sfd);
+
+// input: sfd: socket file descriptor, buff: msg to send, len: length of msg
+// output: error code, 0 pass, -1 fail
+int send_socket(int sfd, char* buff, size_t len);
+
+// input: sfd: socket file descriptor
+// output: error code, 0 pass, -1 fail
+int recv_socket(int sfd);
 
 int generate_socket(int* sfd){
     *sfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -66,20 +74,50 @@ int connect_socket(int sfd, char* addr, uint16_t port){
     return 0;
 }
 
+int send_socket(int sfd, char* buff, size_t len){
+    int rc = 0;
+    if(buff == NULL) return -1;
+    printf(" Msg: %s\n", buff);
+    printf(" Number of Bytes: %lu\n", len);
+    printf(" Sending...\n");
+    rc = send(sfd, buff, len, MSG_NOSIGNAL);
+    if (rc == -1){
+       printf(" send() failed with rc: %d\n", rc);
+       return -1;
+    }
+    else{
+       printf(" send() sent %d bytes\n", rc);
+    }
+    return 0;
+}
+
+int recv_socket(int sfd){
+    char buff[100];
+    int rc = 0;
+
+    rc = recv(sfd, buff, 100, 0);
+    if (rc == -1){
+       printf(" recv() failed with rc: %d\n", rc);
+       return -1;
+    }
+    else{
+        printf(" \nMessage recieved...\n");
+        printf(" Msg len: %d\n", rc);
+        printf(" Msg: %s", buff);
+    }
+    return 0;
+}
+
 int comms(int sfd){
-    char buff_loc [100];
-    char buff_net [100];
     int matches = 0, len = 0;
-    bool quit = false;
     int ready = 0;
     int numOfFiles = 2;
     int revent = 0;
-    bool err = false;
     int count = 0;
+    int rc = 0;
 
-    printf(" Send: \"\\quit\" to break connection\n");
+    printf("\n Send: \"\\quit\" to break connection\n");
 
-    //int poll(struct pollfd fds[], nfds_t nfds, int timeout);
     struct pollfd* pfds;
     pfds = calloc(numOfFiles, sizeof(struct pollfd));
 
@@ -118,29 +156,14 @@ int comms(int sfd){
                         char* buff = fgets(buff_loc, 99, stdin);
                         if (buff != NULL){
                             if (strcmp(buff_loc,"\\quit\n") == 0) return 0;
-
-                             printf(" Msg: %s\n", buff_loc);
-                             printf(" Number of Bytes: %lu\n", strlen(buff_loc));
-                             printf(" Sending...\n");
-                             len = send(sfd, buff_loc, strlen(buff_loc), MSG_NOSIGNAL);
-                             if (len == -1){
-                                printf(" send() failed with rc: %d\n", len);
-                                return -1;
-                             }
-                             else{
-                                printf(" send() sent %d bytes\n", len);
-                             }
+                            if (send_socket(sfd, buff, strlen(buff))) return -1;
                         }
                     }
                 }
                 else if(pfds[i].fd == sfd){
                     if(pfds[i].revents && POLLIN){
                         pfds[i].revents ^= POLLIN;
-                        len = recv(sfd, buff_net, 100, 0);
-                        printf(" \nMessage recieved...\n");
-                        printf(" Msg len: %d\n", len);
-                        printf(" Msg: %s", buff_net);
-                        bzero(buff_net, len);
+                        if (recv_socket(sfd)) return -1;
                     }
                 }
                 else{
